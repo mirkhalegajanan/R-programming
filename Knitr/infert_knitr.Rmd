@@ -1,0 +1,150 @@
+---
+title: "Analysis and Visulization of Infert Dataset"
+author: "Gajanan Mirkhale"
+date: "January 16, 2017"
+output:
+  pdf_document: default
+  word_document: default
+---
+###Infert Dataset Description
+---
+#Description
+
+This is a matched case-control study dating from before the availability of conditional logistic regression.
+Usage
+
+#infert
+
+###Format
+1. 	Education 	          0 = 0-5 years
+		                      1 = 6-11 years
+		                      2 = 12+ years
+2. 	age 	age in years of case
+3. 	parity 	count
+4. 	number of prior 	    0 = 0
+	induced abortions 	    1 = 1
+		                      2 = 2 or more
+5. 	case status      	    1 = case
+		                      0 = control
+6. 	number of prior 	    0 = 0
+	spontaneous abortions 	1 = 1
+		                      2 = 2 or more
+7. 	matched set number 	  1-83
+8. 	stratum number      	1-63
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(reshape2)
+library(plotly)
+library(MASS) 
+library(caret)
+head(infert)
+data("infert")
+names(infert) 
+ls.str(infert)                  #Overview of the data
+
+summary(infert)                 #summary of the dta
+table(infert$case)
+
+
+#Checking out the missing values
+sapply(infert, function(x) sum(is.na(x))) #No missing values 
+```
+
+##create a missing map
+
+```{r}
+# load libraries
+library(Amelia)
+library(mlbench)
+
+missmap(infert, col=c("black", "grey"), legend=FALSE) # No missing values in missing map
+```
+
+## pair-wise scatterplots of all attributes
+
+```{r}
+pairs(infert)
+
+```
+
+## pair-wise Scatterplot Matrix By Class
+
+```{r}
+pairs(education~., data = infert, col=infert$education)
+```
+
+## combine multiple plots into one overall graph
+
+```{r}
+par(mfrow=c(2,2),
+plot(infert$pooled.stratum),
+plot(infert$parity),
+plot(infert$age),
+plot(table(infert$parity)))
+dev.off()
+```
+
+## Create a Histogram 
+
+```{r}
+hist(infert$age,col ="blue")
+```
+
+#generate a linear regression model of the two variables
+
+```{r}
+spontaneous = infert$spontaneous
+age = infert$age
+stratum = infert$stratum
+
+plot( stratum, age )
+abline(lm( age ~ stratum))
+```
+
+##analysed by conditional logistic regression
+
+```{r}
+ require(stats)
+model1 <- glm(case ~ spontaneous+induced, data = infert, family = binomial())
+summary(model1)
+model1
+
+
+library(survival)
+ data(infert)
+model2 <- glm(case ~ age+parity+education+spontaneous+induced,
+                               data = infert, family = binomial())
+summary(model2)
+```
+
+##Comparison of two logistic regression models
+
+```{r}
+
+library('epiDisplay')
+
+model1 <- glm(case ~ induced + spontaneous, data=infert, family=binomial)
+logistic.display(model1)
+
+
+# This is actually not a causal relationship
+layout(matrix(1, ncol = 1))
+lroc(model1, title=TRUE, auc.coords=c(.5,.1))
+
+
+lroc(model1, title=TRUE, cex.main=2, cex.lab=1.5, col.lab="blue", cex.axis=1.3, lwd=3)
+lroc1 <- lroc(model1) # The main title and auc text have disappeared
+
+model2 <- glm(case ~ spontaneous, data=infert, family=binomial)
+logistic.display(model2)
+
+lroc2 <- lroc(model2, add=TRUE, line.col="brown", lty=2)
+legend("bottomright",legend=c(lroc1$model.description, lroc2$model.description),
+       lty=1:2, col=c("red","brown"), bg="white")
+title(main="Comparison of two logistic regression models")
+lrtest(model1, model2) 
+
+```
+
